@@ -11,8 +11,9 @@ class ConversationMetadata:
     """Conversation metadata model."""
     id: str
     userid: str
+    title: str
     is_pinned: bool
-    created_at: int  # epoch timestamp
+    last_used_at: int  # epoch timestamp
 
 
 @dataclass
@@ -27,6 +28,15 @@ class FileMetadata:
     indexed_at: Optional[int] = None  # epoch timestamp when indexing completed
     error_message: Optional[str] = None
     workflow_id: Optional[str] = None  # orchestration workflow ID
+
+@dataclass
+class Attachment:
+    """Attachment model. Abstraction layer over Azure Blob Storage for langgraph file ingestion in a chat conversation."""
+    id: str # Must be a random long string
+    conversation_id: str
+    filename: str
+    blob_name: str # Azure blob storage name
+    created_at: int  # epoch timestamp
 
 
 class DatabaseManager:
@@ -53,10 +63,25 @@ class DatabaseManager:
                 CREATE TABLE IF NOT EXISTS conversations (
                     id TEXT PRIMARY KEY,
                     userid TEXT NOT NULL,
+                    title TEXT NOT NULL DEFAULT 'New Conversation',
                     is_pinned BOOLEAN DEFAULT FALSE,
-                    created_at INTEGER NOT NULL
+                    last_used_at INTEGER NOT NULL
                 )
             """)
+            
+            # Add title column if it doesn't exist (for existing databases)
+            try:
+                conn.execute("ALTER TABLE conversations ADD COLUMN title TEXT NOT NULL DEFAULT 'New Conversation'")
+            except sqlite3.OperationalError:
+                # Column already exists
+                pass
+            
+            # Rename created_at to last_used_at for existing databases
+            try:
+                conn.execute("ALTER TABLE conversations RENAME COLUMN created_at TO last_used_at")
+            except sqlite3.OperationalError:
+                # Column might already be renamed or doesn't exist
+                pass
             
             # Create files table
             conn.execute("""
@@ -86,10 +111,10 @@ class DatabaseManager:
                 ON conversations(userid)
             """)
             
-            # Create index for userid and created_at for ordering
+            # Create index for userid and last_used_at for ordering
             conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_conversations_userid_created_at 
-                ON conversations(userid, created_at DESC)
+                CREATE INDEX IF NOT EXISTS idx_conversations_userid_last_used_at 
+                ON conversations(userid, last_used_at DESC)
             """)
             
             # Create index for files by userid
@@ -104,31 +129,55 @@ class DatabaseManager:
                 ON files(status)
             """)
             
+            # Create attachments table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS attachments (
+                    id TEXT PRIMARY KEY,
+                    conversation_id TEXT NOT NULL,
+                    filename TEXT NOT NULL,
+                    blob_name TEXT NOT NULL,
+                    created_at INTEGER NOT NULL
+                )
+            """)
+            
+            # Create index for attachments by conversation_id
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_attachments_conversation_id 
+                ON attachments(conversation_id)
+            """)
+            
+            # Create index for attachments by created_at for ordering
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_attachments_created_at 
+                ON attachments(created_at DESC)
+            """)
+            
             conn.commit()
     
-    def create_conversation(self, conversation_id: str, userid: str) -> ConversationMetadata:
+    def create_conversation(self, conversation_id: str, userid: str, title: str = "New Conversation") -> ConversationMetadata:
         """Create a new conversation metadata entry."""
-        created_at = int(time.time())
+        last_used_at = int(time.time())
         
         with self.get_connection() as conn:
             conn.execute("""
-                INSERT INTO conversations (id, userid, is_pinned, created_at)
-                VALUES (?, ?, ?, ?)
-            """, (conversation_id, userid, False, created_at))
+                INSERT INTO conversations (id, userid, title, is_pinned, last_used_at)
+                VALUES (?, ?, ?, ?, ?)
+            """, (conversation_id, userid, title, False, last_used_at))
             conn.commit()
         
         return ConversationMetadata(
             id=conversation_id,
             userid=userid,
+            title=title,
             is_pinned=False,
-            created_at=created_at
+            last_used_at=last_used_at
         )
     
     def get_conversation(self, conversation_id: str, userid: str) -> Optional[ConversationMetadata]:
         """Get conversation metadata by ID and userid."""
         with self.get_connection() as conn:
             row = conn.execute("""
-                SELECT id, userid, is_pinned, created_at 
+                SELECT id, userid, title, is_pinned, last_used_at 
                 FROM conversations 
                 WHERE id = ? AND userid = ?
             """, (conversation_id, userid)).fetchone()
@@ -137,27 +186,29 @@ class DatabaseManager:
                 return ConversationMetadata(
                     id=row['id'],
                     userid=row['userid'],
+                    title=row['title'],
                     is_pinned=bool(row['is_pinned']),
-                    created_at=row['created_at']
+                    last_used_at=row['last_used_at']
                 )
         return None
     
     def get_user_conversations(self, userid: str) -> List[ConversationMetadata]:
-        """Get all conversations for a user, ordered by created_at descending."""
+        """Get all conversations for a user, ordered by last_used_at descending."""
         with self.get_connection() as conn:
             rows = conn.execute("""
-                SELECT id, userid, is_pinned, created_at 
+                SELECT id, userid, title, is_pinned, last_used_at 
                 FROM conversations 
                 WHERE userid = ? 
-                ORDER BY created_at DESC
+                ORDER BY last_used_at DESC
             """, (userid,)).fetchall()
             
             return [
                 ConversationMetadata(
                     id=row['id'],
                     userid=row['userid'],
+                    title=row['title'],
                     is_pinned=bool(row['is_pinned']),
-                    created_at=row['created_at']
+                    last_used_at=row['last_used_at']
                 )
                 for row in rows
             ]
@@ -169,7 +220,7 @@ class DatabaseManager:
                 SELECT id 
                 FROM conversations 
                 WHERE userid = ? 
-                ORDER BY created_at DESC 
+                ORDER BY last_used_at DESC 
                 LIMIT 1
             """, (userid,)).fetchone()
             
@@ -183,6 +234,20 @@ class DatabaseManager:
                 SET is_pinned = ? 
                 WHERE id = ? AND userid = ?
             """, (is_pinned, conversation_id, userid))
+            conn.commit()
+            
+            return cursor.rowcount > 0
+    
+    def update_conversation_last_used(self, conversation_id: str, userid: str) -> bool:
+        """Update the last_used_at timestamp for a conversation."""
+        last_used_at = int(time.time())
+        
+        with self.get_connection() as conn:
+            cursor = conn.execute("""
+                UPDATE conversations 
+                SET last_used_at = ? 
+                WHERE id = ? AND userid = ?
+            """, (last_used_at, conversation_id, userid))
             conn.commit()
             
             return cursor.rowcount > 0
@@ -321,6 +386,97 @@ class DatabaseManager:
                 SELECT 1 FROM files 
                 WHERE file_id = ?
             """, (file_id,)).fetchone()
+            
+            return row is not None
+        
+    def create_attachment(self, attachment_id: str, conversation_id: str, filename: str, blob_name: str) -> Attachment:
+        """Create a new attachment entry."""
+        created_at = int(time.time())
+        
+        with self.get_connection() as conn:
+            conn.execute("""
+                INSERT INTO attachments (id, conversation_id, filename, blob_name, created_at)
+                VALUES (?, ?, ?, ?, ?)
+            """, (attachment_id, conversation_id, filename, blob_name, created_at))
+            conn.commit()
+        
+        return Attachment(
+            id=attachment_id,
+            conversation_id=conversation_id,
+            filename=filename,
+            blob_name=blob_name,
+            created_at=created_at
+        )
+    
+    def get_attachment(self, attachment_id: str) -> Optional[Attachment]:
+        """Get attachment by ID."""
+        with self.get_connection() as conn:
+            row = conn.execute("""
+                SELECT id, conversation_id, filename, blob_name, created_at
+                FROM attachments 
+                WHERE id = ?
+            """, (attachment_id,)).fetchone()
+            
+            if row:
+                return Attachment(
+                    id=row['id'],
+                    conversation_id=row['conversation_id'],
+                    filename=row['filename'],
+                    blob_name=row['blob_name'],
+                    created_at=row['created_at']
+                )
+        return None
+    
+    def get_conversation_attachments(self, conversation_id: str) -> List[Attachment]:
+        """Get all attachments for a conversation, ordered by created_at ascending."""
+        with self.get_connection() as conn:
+            rows = conn.execute("""
+                SELECT id, conversation_id, filename, blob_name, created_at
+                FROM attachments 
+                WHERE conversation_id = ? 
+                ORDER BY created_at ASC
+            """, (conversation_id,)).fetchall()
+            
+            return [
+                Attachment(
+                    id=row['id'],
+                    conversation_id=row['conversation_id'],
+                    filename=row['filename'],
+                    blob_name=row['blob_name'],
+                    created_at=row['created_at']
+                )
+                for row in rows
+            ]
+    
+    def delete_attachment(self, attachment_id: str) -> bool:
+        """Delete an attachment."""
+        with self.get_connection() as conn:
+            cursor = conn.execute("""
+                DELETE FROM attachments 
+                WHERE id = ?
+            """, (attachment_id,))
+            conn.commit()
+            
+            return cursor.rowcount > 0
+    
+    def delete_conversation_attachments(self, conversation_id: str) -> bool:
+        """Delete all attachments for a conversation."""
+        with self.get_connection() as conn:
+            cursor = conn.execute("""
+                DELETE FROM attachments 
+                WHERE conversation_id = ?
+            """, (conversation_id,))
+            conn.commit()
+            
+            return cursor.rowcount > 0
+    
+    def attachment_exists(self, attachment_id: str) -> bool:
+        """Check if an attachment exists."""
+        with self.get_connection() as conn:
+            row = conn.execute("""
+                SELECT 1 FROM attachments 
+                WHERE id = ?
+            """, (attachment_id,)).fetchone()
             
             return row is not None
 

@@ -99,7 +99,7 @@ export const GetConversationsList = async (): Promise<ConversationListItem[] | n
   interface ConversationApiResponse {
     id: string
     title: string
-    created_at: number
+    last_used_at: number
     is_pinned: boolean
   }
 
@@ -115,8 +115,8 @@ export const GetConversationsList = async (): Promise<ConversationListItem[] | n
   const conversations = data.map((conv) => ({
     id: conv.id,
     title: conv.title,
-    date: formatRelativeTime(conv.created_at * 1000),
-    createdAt: conv.created_at * 1000,
+    date: formatRelativeTime(conv.last_used_at * 1000),
+    createdAt: conv.last_used_at * 1000,
     isPinned: conv.is_pinned
   }))
 

@@ -6,6 +6,7 @@ from langchain_core.messages.human import HumanMessage
 from lib.auth import get_authenticated_user
 from utils.stream_protocol import generate_stream
 from utils.message_conversion import from_assistant_ui_contents_to_langgraph_contents
+from utils.langgraph_content import get_text_from_contents
 
 from typing import Annotated
 from pydantic import BaseModel
@@ -21,7 +22,7 @@ class ChatRequest(BaseModel):
 chat_conversation_route = APIRouter()
 
 @chat_conversation_route.post("/chat")
-async def chat_completions(request: ChatRequest, _: Annotated[str, Depends(get_authenticated_user)], userid:  Annotated[str | None, Header()] = None):
+def chat_completions(request: ChatRequest, _: Annotated[str, Depends(get_authenticated_user)], userid:  Annotated[str | None, Header()] = None):
     """Chat completions endpoint."""
 
     if not userid:
@@ -40,8 +41,19 @@ async def chat_completions(request: ChatRequest, _: Annotated[str, Depends(get_a
         "content": last_message_langgraph_content
     }]
 
-    # Add user and the conversation id to the database
-    db_manager.create_conversation(conversation_id, userid)
+    # Extract title from the first message content
+    title = get_text_from_contents(last_message['content'])
+    # Limit title length and provide a default if empty
+    if not title:
+        title = "New Conversation"
+    else:
+        # Truncate title to first 50 characters for display
+        title = title[:50].strip()
+        if len(title) < len(get_text_from_contents(last_message['content'])):
+            title += "..."
+
+    # Add user and the conversation id to the database with title
+    db_manager.create_conversation(conversation_id, userid, title)
 
     return StreamingResponse(
         generate_stream(graph, input_message, conversation_id),
@@ -82,26 +94,10 @@ def get_conversations(_: Annotated[str, Depends(get_authenticated_user)], userid
     # Convert to the expected API response format
     response = []
     for conv in conversations:
-        # Get the first message from the conversation to use as title
-        # For now, we'll use a default title since we don't store message content in metadata
-        # In a real implementation, you might want to fetch the first message from LangGraph state
-        conv_graph_val = graph.get_state(config={"configurable": {"thread_id": conv.id}}).values
-        conv_graph_messages = conv_graph_val.get("messages", []) if conv_graph_val else []
-        title = f"Conversations {conv.id[:8]}..."
-
-        if conv_graph_messages:
-            first_message = conv_graph_messages[0]
-            content = first_message.content
-
-            if isinstance(content, list) and len(content) > 0 and content[0]['type'] == 'text':
-                title = content[0]['text']
-            elif type(content) is str:
-                title = content
-
         response.append({
             "id": conv.id,
-            "title": title,
-            "created_at": conv.created_at,
+            "title": conv.title,
+            "last_used_at": conv.last_used_at,
             "is_pinned": conv.is_pinned
         })
     
@@ -116,6 +112,9 @@ def get_chat_history(_: Annotated[str, Depends(get_authenticated_user)], userid:
     # Check if the conversation exists and belongs to the user
     if not db_manager.conversation_exists(conversation_id, userid):
         raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    # Update last_used_at timestamp for the conversation
+    db_manager.update_conversation_last_used(conversation_id, userid)
     
     # Fetch chat history for the conversation from LangGraph state
     try:
@@ -144,6 +143,9 @@ def chat_conversation(_: Annotated[str, Depends(get_authenticated_user)], userid
     # Check if the conversation exists and belongs to the user
     if not db_manager.conversation_exists(conversation_id, userid):
         raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    # Update last_used_at timestamp for the conversation
+    db_manager.update_conversation_last_used(conversation_id, userid)
     
     # Convert the input message 
     if type(request.messages) is not list or len(request.messages) == 0:
