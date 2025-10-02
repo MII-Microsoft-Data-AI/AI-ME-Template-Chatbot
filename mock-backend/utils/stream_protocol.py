@@ -7,7 +7,6 @@ from langgraph.graph.state import CompiledStateGraph
 from typing import List
 
 def generate_stream(graph: CompiledStateGraph, input_message: List[HumanMessage], conversation_id: str):
-    print("STARTINGGG STREAM")
     # Generate unique message ID
     message_id = str(uuid.uuid4())
     
@@ -83,5 +82,3 @@ def generate_stream(graph: CompiledStateGraph, input_message: List[HumanMessage]
         # Send Error (3:)
         error_message = str(e)
         yield f"3:{json.dumps(error_message)}\n"
-
-    print("FINISHING STREAM")
