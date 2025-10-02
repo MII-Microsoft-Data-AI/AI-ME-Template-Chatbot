@@ -6,6 +6,8 @@ import { AssistantRuntimeProvider, useAssistantState } from '@assistant-ui/react
 import { useRouter } from 'next/navigation';
 import { FirstChatAPIRuntime, GetLastConversationId } from '@/lib/integration/client/chat-conversation';
 
+const autoRedirect = false
+
 function RedirectWhenDone() {
   const router = useRouter()
   const [FirstRunning, setFirstRunning] = useState(false)
@@ -28,7 +30,7 @@ function RedirectWhenDone() {
       setFirstRunning(true)
     }
 
-    if (!isRunning && FirstRunning) {
+    if (!isRunning && FirstRunning && autoRedirect) {
       getLastConversationIdAndRedirect()
     }
   }, [isRunning])

@@ -40,12 +40,18 @@ def generate_stream(graph: CompiledStateGraph, input_message: List[HumanMessage]
 
                 # Handle tool calls - Reset current message tool calls and rebuild
                 if hasattr(msg, 'tool_calls') and msg.tool_calls:
-                    # Clear the current message tool calls list
-                    current_message_tool_calls = []
+                    print(f"DEBUG: Received {len(msg.tool_calls)} tool_calls")
+                    # Check if this message has any real tool calls (not empty ones)
+                    has_real_tool_calls = any(tool_call.get('name', '') != "" for tool_call in msg.tool_calls)
+                    
+                    # Only clear if we have real tool calls
+                    if has_real_tool_calls:
+                        current_message_tool_calls = []
                     
                     for tool_call in msg.tool_calls:
                         tool_call_id = tool_call.get('id', str(uuid.uuid4()))
                         tool_name = tool_call.get('name', '')
+                        print(f"DEBUG: Tool call - id={tool_call_id}, name={tool_name}")
 
                         if tool_name != "":
                             # Add to current message tool calls list (maintains order)
@@ -57,22 +63,36 @@ def generate_stream(graph: CompiledStateGraph, input_message: List[HumanMessage]
                                 
                                 # Send StartToolCall (b:)
                                 yield f"b:{json.dumps({'toolCallId': tool_call_id, 'toolName': tool_name})}\n"
+                        else:
+                            print(f"DEBUG: Skipping empty tool call")
+                    
+                    print(f"DEBUG: current_message_tool_calls after processing: {current_message_tool_calls}")
                 
                 # Handle streaming tool call chunks
                 if hasattr(msg, 'tool_call_chunks') and msg.tool_call_chunks:
+                    print(f"DEBUG: Received {len(msg.tool_call_chunks)} tool_call_chunks")
+                    print(f"DEBUG: current_message_tool_calls at chunk time: {current_message_tool_calls}")
                     for chunk in msg.tool_call_chunks:
+                        print(f"DEBUG: Full chunk: {chunk}")
                         args_chunk = chunk.get("args", "")
                         chunk_index = chunk.get("index", 0)
+                        print(f"DEBUG: args_chunk='{args_chunk}', chunk_index={chunk_index}, len(current_message_tool_calls)={len(current_message_tool_calls)}")
                         
                         # Use the current message's tool call list to map index to tool_call_id
                         tool_call_id = None
                         if chunk_index < len(current_message_tool_calls):
                             tool_call_id = current_message_tool_calls[chunk_index]
+                            print(f"DEBUG: Mapped chunk_index {chunk_index} to tool_call_id: {tool_call_id}")
+                        else:
+                            print(f"DEBUG: WARNING - chunk_index {chunk_index} >= len(current_message_tool_calls) {len(current_message_tool_calls)}")
                         
                         # Accumulate args and send ToolCallArgsTextDelta (c:)
                         if tool_call_id and tool_call_id in tool_calls and args_chunk:
                             tool_calls[tool_call_id]["args"] += args_chunk
+                            print(f"DEBUG: Accumulating args for {tool_call_id}, total so far: {len(tool_calls[tool_call_id]['args'])} chars")
                             yield f"c:{json.dumps({'toolCallId': tool_call_id, 'argsTextDelta': args_chunk})}\n"
+                        else:
+                            print(f"DEBUG: Skipping chunk - tool_call_id={tool_call_id}, in tool_calls={tool_call_id in tool_calls if tool_call_id else False}, has args_chunk={bool(args_chunk)}")
                         
 
         # Send FinishMessage (d:) with usage stats

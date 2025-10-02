@@ -18,6 +18,7 @@ from langchain_core.messages.utils import (
 
 from .tools import AVAILABLE_TOOLS
 from .model import model
+from utils.langgraph_content import sanitize_and_validate_messages
 
 class AgentState(TypedDict):
     """State for the agent graph."""
@@ -64,6 +65,9 @@ def call_model(state: AgentState, config = None) -> Dict[str, List[BaseMessage]]
         start_on="human",
         end_on=("human", "tool"),
     )
+
+    # Sanitize and validate messages to ensure proper tool call/response pairing
+    messages = sanitize_and_validate_messages(messages)
 
     system_prompt = """
 # Your Role
@@ -137,7 +141,7 @@ If you cannot find supporting documents: explicitly say "No matching documents f
     """
 
     system_msg = SystemMessage(content=system_prompt.strip())
-    messages = [system_msg] + state["messages"]
+    messages = [system_msg] + messages
         
     # Bind tools to the model
     model_with_tools = model.bind_tools(AVAILABLE_TOOLS)
@@ -178,4 +182,6 @@ workflow.add_conditional_edges(
 workflow.add_edge("tools", "agent")
 
 # Compile the graph
-graph = workflow.compile(checkpointer=checkpointer)
+graph = workflow.compile(checkpointer=checkpointer).with_config(
+    {"recursion_limit": 100}
+)

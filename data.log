@@ -1,0 +1,16 @@
+🔧 Starting backend server...
+This is not reloadable. Restart this command to apply changes.
+cd mock-backend && uv run uvicorn main:app --host 0.0.0.0 --port 8000
+Orchestrator started
+✓ Tools loaded. Tools available: ['get_current_time', 'Python_REPL', 'web_search', 'azure_search_documents', 'azure_search_semantic', 'azure_search_filter', 'azure_search_vector']
+INFO:     ::1:0 - "GET /conversations/6954de18-eda5-4b55-8a93-26bb9be6a8a4 HTTP/1.1" 200 OK
+INFO:     ::1:0 - "GET /conversations HTTP/1.1" 200 OK
+INFO:     ::1:0 - "POST /conversations/6954de18-eda5-4b55-8a93-26bb9be6a8a4/chat HTTP/1.1" 200 OK
+Skipping incomplete tool call sequence. Missing responses for: {'call_oJj2DOwqABlrOaf9NjQQYQYY'}
+INFO:     ::1:0 - "GET /conversations HTTP/1.1" 200 OK
+INFO:     ::1:0 - "POST /conversations/6954de18-eda5-4b55-8a93-26bb9be6a8a4/chat HTTP/1.1" 200 OK
+Skipping incomplete tool call sequence. Missing responses for: {'call_oJj2DOwqABlrOaf9NjQQYQYY'}
+INFO:     ::1:0 - "POST /conversations/6954de18-eda5-4b55-8a93-26bb9be6a8a4/chat HTTP/1.1" 200 OK
+Skipping incomplete tool call sequence. Missing responses for: {'call_oJj2DOwqABlrOaf9NjQQYQYY'}
+INFO:     ::1:0 - "GET /conversations HTTP/1.1" 200 OK
+INFO:     ::1:0 - "GET /conversations HTTP/1.1" 200 OK

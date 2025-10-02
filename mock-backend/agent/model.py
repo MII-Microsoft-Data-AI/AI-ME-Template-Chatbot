@@ -17,7 +17,7 @@ def create_azure_model(**kwargs) -> AzureChatOpenAI:
     Returns:
         AzureChatOpenAI: Configured Azure OpenAI model
     """
-    return AzureChatOpenAI(
+    llm = AzureChatOpenAI(
         azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
         azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME"),
         api_key=os.getenv("AZURE_OPENAI_API_KEY"),
@@ -26,6 +26,7 @@ def create_azure_model(**kwargs) -> AzureChatOpenAI:
         streaming=True,
         **kwargs
     )
+    return llm
 
 
 # Default model instance
