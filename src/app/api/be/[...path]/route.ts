@@ -81,7 +81,9 @@ async function handleProxyRequest(
 
     let body = undefined
     if (['POST', 'PUT', 'PATCH'].includes(method)) {
-      body = await request.arrayBuffer()
+      // Use blob() instead of arrayBuffer() to avoid detachment issues with multipart/form-data
+      const blob = await request.blob()
+      body = blob
     }
 
     // Make the request to the backend

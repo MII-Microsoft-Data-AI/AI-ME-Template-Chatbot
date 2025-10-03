@@ -27,21 +27,19 @@ class AttachmentDetailResponse(BaseModel):
     id: str
     filename: str
     blob_url: str
-    conversation_id: str
+    userid: str
 
 
 @attachment_routes.post("/", response_model=AttachmentUploadResponse)
 async def upload_attachment(
     file: UploadFile = File(...),
-    conversation_id: str = Header(...),
     userid: str | None = Header(None)
 ):
     """
-    Upload an attachment for a conversation.
+    Upload an attachment.
     
     Args:
         file: The file to upload
-        conversation_id: The conversation ID from header
         userid: User ID from header
         
     Returns:
@@ -56,9 +54,9 @@ async def upload_attachment(
     try:
         # Generate unique IDs
         attachment_id = str(uuid.uuid4())
-        blob_name = f"attachments/{userid}/{conversation_id}/{attachment_id}_{file.filename}"
+        blob_name = f"attachments/{userid}/{attachment_id}_{file.filename}"
         
-        logger.info(f"Uploading attachment: {file.filename} for conversation {conversation_id}")
+        logger.info(f"Uploading attachment: {file.filename} for user {userid}")
         
         # Upload to Azure Blob Storage
         file_content = await file.read()
@@ -67,7 +65,7 @@ async def upload_attachment(
         # Add to attachment database record
         db_manager.create_attachment(
             attachment_id=attachment_id,
-            conversation_id=conversation_id,
+            userid=userid,
             filename=file.filename or "unknown",
             blob_name=blob_name
         )
@@ -127,7 +125,7 @@ async def get_attachment_by_id(
             id=attachment.id,
             filename=attachment.filename,
             blob_url=blob_url,
-            conversation_id=attachment.conversation_id
+            userid=attachment.userid
         )
         
     except HTTPException:
@@ -194,16 +192,14 @@ async def delete_attachment(
         )
 
 
-@attachment_routes.get("/conversation/{conversation_id}")
-async def get_conversation_attachments(
-    conversation_id: str,
+@attachment_routes.get("/user")
+async def get_user_attachments(
     userid: str | None = Header(None)
 ):
     """
-    Get all attachments for a conversation.
+    Get all attachments for a user.
     
     Args:
-        conversation_id: The conversation ID
         userid: User ID from header
         
     Returns:
@@ -216,10 +212,10 @@ async def get_conversation_attachments(
         )
     
     try:
-        attachments = db_manager.get_conversation_attachments(conversation_id)
+        attachments = db_manager.get_user_attachments(userid)
         
         return {
-            "conversation_id": conversation_id,
+            "userid": userid,
             "attachments": [
                 {
                     "id": att.id,
@@ -232,7 +228,7 @@ async def get_conversation_attachments(
         }
         
     except Exception as e:
-        logger.error(f"Error retrieving conversation attachments: {str(e)}")
+        logger.error(f"Error retrieving user attachments: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve attachments: {str(e)}"

@@ -8,16 +8,16 @@ The Attachment API provides endpoints for uploading, retrieving, and managing fi
 ### 1. Upload Attachment
 **POST** `/api/v1/attachments/`
 
-Upload a file attachment for a conversation.
+Upload a file attachment.
 
 **Headers:**
-- `conversation_id` (required): The conversation ID to attach the file to
 - `userid` (required): User ID
 - `Authorization`: Basic auth credentials
 
 **Request:**
 - Content-Type: `multipart/form-data`
-- Body: File upload
+- Form Fields:
+  - `file`: File to upload (required)
 
 **Response:**
 ```json
@@ -50,7 +50,7 @@ Retrieve attachment details and a temporary download URL with SAS token (valid f
   "id": "123e4567-e89b-12d3-a456-426614174000",
   "filename": "example.pdf",
   "blob_url": "https://storage.blob.core.windows.net/...?sas_token",
-  "conversation_id": "conv_123"
+  "userid": "user_123"
 }
 ```
 
@@ -87,10 +87,10 @@ Delete an attachment from both blob storage and database.
 
 ---
 
-### 4. Get Conversation Attachments
-**GET** `/api/v1/attachments/conversation/{conversation_id}`
+### 4. Get User Attachments
+**GET** `/api/v1/attachments/user`
 
-Get all attachments for a specific conversation.
+Get all attachments for the current user.
 
 **Headers:**
 - `userid` (required): User ID
@@ -99,7 +99,7 @@ Get all attachments for a specific conversation.
 **Response:**
 ```json
 {
-  "conversation_id": "conv_123",
+  "userid": "user_123",
   "attachments": [
     {
       "id": "123e4567-e89b-12d3-a456-426614174000",
@@ -124,7 +124,7 @@ Get all attachments for a specific conversation.
 ```sql
 CREATE TABLE attachments (
     id TEXT PRIMARY KEY,
-    conversation_id TEXT NOT NULL,
+    userid TEXT NOT NULL,
     filename TEXT NOT NULL,
     blob_name TEXT NOT NULL,
     created_at INTEGER NOT NULL
@@ -132,7 +132,7 @@ CREATE TABLE attachments (
 ```
 
 **Indexes:**
-- `idx_attachments_conversation_id` on `conversation_id`
+- `idx_attachments_userid` on `userid`
 - `idx_attachments_created_at` on `created_at DESC`
 
 ---
@@ -141,12 +141,12 @@ CREATE TABLE attachments (
 
 Files are stored in Azure Blob Storage with the following naming convention:
 ```
-attachments/{userid}/{conversation_id}/{attachment_id}_{filename}
+attachments/{userid}/{attachment_id}_{filename}
 ```
 
 Example:
 ```
-attachments/user123/conv_456/789e-4567-e89b-12d3-a456_{original_filename.pdf}
+attachments/user123/789e-4567-e89b-12d3-a456_{original_filename.pdf}
 ```
 
 ---
@@ -154,7 +154,7 @@ attachments/user123/conv_456/789e-4567-e89b-12d3-a456_{original_filename.pdf}
 ## Implementation Details
 
 ### File Upload Flow
-1. Client uploads file with `conversation_id` header
+1. Client uploads file
 2. Server generates unique `attachment_id`
 3. File uploaded to Azure Blob Storage with structured path
 4. Metadata stored in SQLite database
@@ -194,10 +194,7 @@ from requests.auth import HTTPBasicAuth
 
 # Upload attachment
 files = {'file': open('document.pdf', 'rb')}
-headers = {
-    'userid': 'user123',
-    'conversation_id': 'conv_456'
-}
+headers = {'userid': 'user123'}
 auth = HTTPBasicAuth('apiuser', 'securepass123')
 
 response = requests.post(
@@ -227,7 +224,6 @@ print(response.json())
 # Upload
 curl -X POST http://localhost:8000/api/v1/attachments/ \
   -H "userid: user123" \
-  -H "conversation_id: conv_456" \
   -u apiuser:securepass123 \
   -F "file=@document.pdf"
 

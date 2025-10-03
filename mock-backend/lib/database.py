@@ -33,7 +33,7 @@ class FileMetadata:
 class Attachment:
     """Attachment model. Abstraction layer over Azure Blob Storage for langgraph file ingestion in a chat conversation."""
     id: str # Must be a random long string
-    conversation_id: str
+    userid: str
     filename: str
     blob_name: str # Azure blob storage name
     created_at: int  # epoch timestamp
@@ -133,17 +133,17 @@ class DatabaseManager:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS attachments (
                     id TEXT PRIMARY KEY,
-                    conversation_id TEXT NOT NULL,
+                    userid TEXT NOT NULL,
                     filename TEXT NOT NULL,
                     blob_name TEXT NOT NULL,
                     created_at INTEGER NOT NULL
                 )
             """)
             
-            # Create index for attachments by conversation_id
+            # Create index for attachments by userid
             conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_attachments_conversation_id 
-                ON attachments(conversation_id)
+                CREATE INDEX IF NOT EXISTS idx_attachments_userid 
+                ON attachments(userid)
             """)
             
             # Create index for attachments by created_at for ordering
@@ -389,20 +389,20 @@ class DatabaseManager:
             
             return row is not None
         
-    def create_attachment(self, attachment_id: str, conversation_id: str, filename: str, blob_name: str) -> Attachment:
+    def create_attachment(self, attachment_id: str, userid: str, filename: str, blob_name: str) -> Attachment:
         """Create a new attachment entry."""
         created_at = int(time.time())
         
         with self.get_connection() as conn:
             conn.execute("""
-                INSERT INTO attachments (id, conversation_id, filename, blob_name, created_at)
+                INSERT INTO attachments (id, userid, filename, blob_name, created_at)
                 VALUES (?, ?, ?, ?, ?)
-            """, (attachment_id, conversation_id, filename, blob_name, created_at))
+            """, (attachment_id, userid, filename, blob_name, created_at))
             conn.commit()
         
         return Attachment(
             id=attachment_id,
-            conversation_id=conversation_id,
+            userid=userid,
             filename=filename,
             blob_name=blob_name,
             created_at=created_at
@@ -412,7 +412,7 @@ class DatabaseManager:
         """Get attachment by ID."""
         with self.get_connection() as conn:
             row = conn.execute("""
-                SELECT id, conversation_id, filename, blob_name, created_at
+                SELECT id, userid, filename, blob_name, created_at
                 FROM attachments 
                 WHERE id = ?
             """, (attachment_id,)).fetchone()
@@ -420,27 +420,27 @@ class DatabaseManager:
             if row:
                 return Attachment(
                     id=row['id'],
-                    conversation_id=row['conversation_id'],
+                    userid=row['userid'],
                     filename=row['filename'],
                     blob_name=row['blob_name'],
                     created_at=row['created_at']
                 )
         return None
     
-    def get_conversation_attachments(self, conversation_id: str) -> List[Attachment]:
-        """Get all attachments for a conversation, ordered by created_at ascending."""
+    def get_user_attachments(self, userid: str) -> List[Attachment]:
+        """Get all attachments for a user, ordered by created_at descending."""
         with self.get_connection() as conn:
             rows = conn.execute("""
-                SELECT id, conversation_id, filename, blob_name, created_at
+                SELECT id, userid, filename, blob_name, created_at
                 FROM attachments 
-                WHERE conversation_id = ? 
-                ORDER BY created_at ASC
-            """, (conversation_id,)).fetchall()
+                WHERE userid = ? 
+                ORDER BY created_at DESC
+            """, (userid,)).fetchall()
             
             return [
                 Attachment(
                     id=row['id'],
-                    conversation_id=row['conversation_id'],
+                    userid=row['userid'],
                     filename=row['filename'],
                     blob_name=row['blob_name'],
                     created_at=row['created_at']
@@ -455,17 +455,6 @@ class DatabaseManager:
                 DELETE FROM attachments 
                 WHERE id = ?
             """, (attachment_id,))
-            conn.commit()
-            
-            return cursor.rowcount > 0
-    
-    def delete_conversation_attachments(self, conversation_id: str) -> bool:
-        """Delete all attachments for a conversation."""
-        with self.get_connection() as conn:
-            cursor = conn.execute("""
-                DELETE FROM attachments 
-                WHERE conversation_id = ?
-            """, (conversation_id,))
             conn.commit()
             
             return cursor.rowcount > 0
