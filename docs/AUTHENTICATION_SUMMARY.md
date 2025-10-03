@@ -35,7 +35,6 @@
 # Dependency injection pattern
 async def endpoint(
     request: RequestModel,
-    username: Annotated[str, Depends(get_authenticated_user)]
 ):
     # Endpoint logic with authenticated user
     pass

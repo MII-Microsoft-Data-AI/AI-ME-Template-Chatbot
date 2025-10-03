@@ -2,8 +2,6 @@ import json
 
 from utils.uuid import generate_uuid
 from langchain_core.load import dumps
-from langchain_core.messages.human import HumanMessage
-from lib.auth import get_authenticated_user
 from utils.stream_protocol import generate_stream
 from utils.message_conversion import from_assistant_ui_contents_to_langgraph_contents
 from utils.langgraph_content import get_text_from_contents
@@ -22,7 +20,7 @@ class ChatRequest(BaseModel):
 chat_conversation_route = APIRouter()
 
 @chat_conversation_route.post("/chat")
-def chat_completions(request: ChatRequest, _: Annotated[str, Depends(get_authenticated_user)], userid:  Annotated[str | None, Header()] = None):
+def chat_completions(request: ChatRequest, userid:  Annotated[str | None, Header()] = None):
     """Chat completions endpoint."""
 
     if not userid:
@@ -69,7 +67,7 @@ def chat_completions(request: ChatRequest, _: Annotated[str, Depends(get_authent
 
 
 @chat_conversation_route.get("/last-conversation-id")
-def get_last_conversation_id(_: Annotated[str, Depends(get_authenticated_user)], userid:  Annotated[str | None, Header()] = None):
+def get_last_conversation_id( userid:  Annotated[str | None, Header()] = None):
     """Get last conversation ID endpoint."""
     if not userid:
         return {"error": "Missing userid header"}
@@ -83,7 +81,7 @@ def get_last_conversation_id(_: Annotated[str, Depends(get_authenticated_user)],
     }
 
 @chat_conversation_route.get("/conversations")
-def get_conversations(_: Annotated[str, Depends(get_authenticated_user)], userid:  Annotated[str | None, Header()] = None):
+def get_conversations(userid:  Annotated[str | None, Header()] = None):
     """Get conversations endpoint."""
     if not userid:
         return {"error": "Missing userid header"}
@@ -104,7 +102,7 @@ def get_conversations(_: Annotated[str, Depends(get_authenticated_user)], userid
     return response
 
 @chat_conversation_route.get("/conversations/{conversation_id}")
-def get_chat_history(_: Annotated[str, Depends(get_authenticated_user)], userid:  Annotated[str | None, Header()] = None, conversation_id: str = ""):
+def get_chat_history(userid:  Annotated[str | None, Header()] = None, conversation_id: str = ""):
     """Get chat history for a conversation."""
     if not userid:
         return {"error": "Missing userid header"}
@@ -130,7 +128,7 @@ def get_chat_history(_: Annotated[str, Depends(get_authenticated_user)], userid:
         raise HTTPException(status_code=500, detail=f"Failed to fetch chat history: {str(e)}")
 
 @chat_conversation_route.post("/conversations/{conversation_id}/chat")
-def chat_conversation(_: Annotated[str, Depends(get_authenticated_user)], userid: Annotated[str | None, Header()] = None, conversation_id: str = "", request: ChatRequest = None):
+def chat_conversation( userid: Annotated[str | None, Header()] = None, conversation_id: str = "", request: ChatRequest = None):
     """Chat in a specific conversation."""
 
     if not userid:
@@ -170,7 +168,7 @@ def chat_conversation(_: Annotated[str, Depends(get_authenticated_user)], userid
         }
     )
 @chat_conversation_route.delete("/conversations/{conversation_id}")
-def delete_conversation(_: Annotated[str, Depends(get_authenticated_user)], userid: Annotated[str | None, Header()] = None, conversation_id: str = ""):
+def delete_conversation(userid: Annotated[str | None, Header()] = None, conversation_id: str = ""):
     """Delete a conversation."""
 
     if not userid:
@@ -185,7 +183,7 @@ def delete_conversation(_: Annotated[str, Depends(get_authenticated_user)], user
     return {"message": "Conversation deleted successfully"}
 
 @chat_conversation_route.post("/conversations/{conversation_id}/pin")
-def pin_conversation(_: Annotated[str, Depends(get_authenticated_user)], userid: Annotated[str | None, Header()] = None, conversation_id: str = ""):
+def pin_conversation(userid: Annotated[str | None, Header()] = None, conversation_id: str = ""):
     """Pin or unpin a conversation."""
 
     if not userid:

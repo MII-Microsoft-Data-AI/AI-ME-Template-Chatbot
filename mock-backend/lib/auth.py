@@ -48,17 +48,3 @@ def verify_credentials(credentials: Annotated[HTTPBasicCredentials, Depends(secu
         )
     
     return credentials.username
-
-
-# Dependency that can be used in route handlers
-def get_authenticated_user(username: Annotated[str, Depends(verify_credentials)]) -> str:
-    """
-    Dependency that ensures the user is authenticated.
-    
-    Args:
-        username: Username from successful authentication
-        
-    Returns:
-        str: Authenticated username
-    """
-    return username

@@ -1,17 +1,15 @@
 import os
 import uuid
 import logging
-from typing import List, Optional, Annotated
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, status, Header
+from typing import List, Annotated
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Header
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
-from azure.storage.blob import BlobServiceClient, generate_blob_sas, BlobSasPermissions
-from azure.search.documents import SearchClient
-from azure.core.credentials import AzureKeyCredential
 from lib.database import db_manager, FileMetadata
 from orchestration import get_orchestrator
-from lib.auth import verify_credentials
-from datetime import datetime, timedelta
+
+from lib.blob import get_blob_service_client
+from lib.search import get_search_client
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -40,22 +38,7 @@ class ChunkDetailResponse(BaseModel):
     metadata: dict
     file_url: str
 
-# Azure clients
-def get_blob_service_client():
-    """Get Azure Blob Service client."""
-    return BlobServiceClient.from_connection_string(
-        os.getenv("AZURE_STORAGE_CONNECTION_STRING")
-    )
-
-def get_search_client():
-    """Get Azure AI Search client."""
-    return SearchClient(
-        endpoint=os.getenv("AZURE_SEARCH_ENDPOINT"),
-        index_name=os.getenv("AZURE_SEARCH_INDEX_NAME"),
-        credential=AzureKeyCredential(os.getenv("AZURE_SEARCH_API_KEY"))
-    )
-
-@file_indexing_route.post("/files", response_model=FileUploadResponse)
+@file_indexing_route.post("/", response_model=FileUploadResponse)
 async def upload_file(
     file: UploadFile = File(...),
     userid:  Annotated[str | None, Header()] = None,
@@ -131,7 +114,7 @@ async def upload_file(
         logger.error(f"File upload failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"File upload failed: {str(e)}")
 
-@file_indexing_route.get("/files", response_model=FileListResponse)
+@file_indexing_route.get("/", response_model=FileListResponse)
 def list_files(credentials: HTTPBasicCredentials = Depends(security), userid:  Annotated[str | None, Header()] = None,):
     """List all files for the authenticated user with real-time workflow status."""
     try:
@@ -181,7 +164,7 @@ def list_files(credentials: HTTPBasicCredentials = Depends(security), userid:  A
         logger.error(f"Failed to list files: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to list files: {str(e)}")
 
-@file_indexing_route.get("/files/{file_id}", response_model=FileMetadata)
+@file_indexing_route.get("/{file_id}", response_model=FileMetadata)
 def get_file_status(
     file_id: str,
     credentials: HTTPBasicCredentials = Depends(security),
@@ -236,7 +219,7 @@ def get_file_status(
         logger.error(f"Failed to get file status: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to get file status: {str(e)}")
 
-@file_indexing_route.delete("/files/{file_id}", response_model=FileDeleteResponse)
+@file_indexing_route.delete("/{file_id}", response_model=FileDeleteResponse)
 async def delete_file(
     file_id: str,
     credentials: HTTPBasicCredentials = Depends(security),
@@ -307,7 +290,7 @@ async def delete_file(
         logger.error(f"Failed to delete file: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to delete file: {str(e)}")
 
-@file_indexing_route.post("/files/{file_id}/reindex")
+@file_indexing_route.post("/{file_id}/reindex")
 async def reindex_file(
     file_id: str,
     credentials: HTTPBasicCredentials = Depends(security),
@@ -356,7 +339,7 @@ async def reindex_file(
         logger.error(f"Failed to start re-indexing: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to start re-indexing: {str(e)}")
 
-@file_indexing_route.get("/files/{file_id}/workflow-status")
+@file_indexing_route.get("/{file_id}/workflow-status")
 def get_workflow_status(
     file_id: str,
     credentials: HTTPBasicCredentials = Depends(security),
@@ -411,81 +394,3 @@ def get_workflow_status(
     except Exception as e:
         logger.error(f"Failed to get workflow status: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to get workflow status: {str(e)}")
-    
-@file_indexing_route.get("/chunk/{chunk_id}", response_model=ChunkDetailResponse)
-def get_chunk_detail(
-    chunk_id: str,
-    credentials: HTTPBasicCredentials = Depends(security),
-    userid: Annotated[str | None, Header()] = None,
-):
-    """
-    Use Azure AI Search to get the chunk detail by chunk_id.
-    and then return the chunk content and metadata.
-    Also add a temporary Blob link using SAS Token to the original file if possible. Using the file_id field in the chunk metadata.
-    """
-    try:
-        # Verify authentication
-        if not userid:
-            raise HTTPException(status_code=400, detail="Missing userid header")
-        user_id = userid
-        
-        # Get chunk from Azure AI Search
-        search_client = get_search_client()
-        results = list(search_client.search(
-            search_text="*",
-            filter=f"id eq '{chunk_id}'",
-            top=1
-        ))
-        
-        if not results:
-            raise HTTPException(status_code=404, detail="Chunk not found")
-        
-        chunk = results[0]
-        content = chunk['content']
-        metadata = dict(chunk)  # Convert to dict for response
-        
-        # Extract file_id from metadata
-        file_id = metadata.get('file_id')
-        if not file_id:
-            raise HTTPException(status_code=404, detail="File ID not found in chunk metadata")
-        
-        # Get file metadata from database
-        file_metadata = db_manager.get_file(file_id)
-        if not file_metadata:
-            raise HTTPException(status_code=404, detail="File not found")
-        
-        # Check if user owns the file
-        if file_metadata.userid != user_id:
-            raise HTTPException(status_code=403, detail="Access denied")
-        
-        # Generate SAS token for the blob
-        blob_service = get_blob_service_client()
-        container_name = os.getenv("AZURE_STORAGE_CONTAINER_NAME")
-        blob_client = blob_service.get_blob_client(
-            container=container_name,
-            blob=file_metadata.blob_name
-        )
-        
-        # Generate SAS URL with read permission, expires in 1 hour
-        sas_token = generate_blob_sas(
-            account_name=blob_service.account_name,
-            container_name=container_name,
-            blob_name=file_metadata.blob_name,
-            account_key=blob_service.credential.account_key,
-            permission=BlobSasPermissions(read=True),
-            expiry=datetime.utcnow() + timedelta(hours=1)
-        )
-        
-        file_url = f"https://{blob_service.account_name}.blob.core.windows.net/{container_name}/{file_metadata.blob_name}?{sas_token}"
-        
-        return ChunkDetailResponse(
-            content=content,
-            metadata=metadata,
-            file_url=file_url
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get chunk detail: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to get chunk detail: {str(e)}")

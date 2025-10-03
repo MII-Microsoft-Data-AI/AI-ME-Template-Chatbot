@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Depends
 
 # Utils and modules
-from lib.auth import get_authenticated_user
+from lib.auth import verify_credentials
 
 # Run orchestration
 from orchestration import get_orchestrator
@@ -32,9 +32,9 @@ app.add_middleware(
 )
 
 @app.get("/")
-async def root(username: Annotated[str, Depends(get_authenticated_user)]):
+async def root():
     """Root endpoint."""
-    return {"message": "LangGraph Azure Inference API is running", "authenticated_user": username}
+    return {"message": "LangGraph Azure Inference API is running"}
 
 
 @app.get("/health")
@@ -46,15 +46,34 @@ async def health():
 # Add external routers
 from routes.chat_conversation import chat_conversation_route
 from routes.file_indexing import file_indexing_route
+from routes.attachment import attachment_routes
+from routes.chunk import chunk_route
 
+# Apply authentication dependency to all routers
 app.include_router(
-    chat_conversation_route
+    chat_conversation_route,
+    dependencies=[Depends(verify_credentials)]
 )
 
 app.include_router(
     file_indexing_route,
-    prefix="/api/v1",
-    tags=["file-indexing"]
+    prefix="/api/v1/files",
+    tags=["file-indexing"],
+    dependencies=[Depends(verify_credentials)]
+)
+
+app.include_router(
+    attachment_routes,
+    prefix="/api/v1/attachments",
+    tags=["attachments"],
+    dependencies=[Depends(verify_credentials)]
+)
+
+app.include_router(
+    chunk_route,
+    prefix="/api/v1/chunk",
+    tags=["chunk"],
+    dependencies=[Depends(verify_credentials)]
 )
 
 if __name__ == "__main__":
