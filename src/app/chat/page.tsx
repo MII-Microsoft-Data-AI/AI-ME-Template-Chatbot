@@ -5,6 +5,7 @@ import { Thread } from "@/components/assistant-ui/thread";
 import { AssistantRuntimeProvider, useAssistantState } from '@assistant-ui/react';
 import { useRouter } from 'next/navigation';
 import { FirstChatAPIRuntime, GetLastConversationId } from '@/lib/integration/client/chat-conversation';
+import { compositeAttachmentAdapter } from '@/lib/integration/client/attachment';
 
 const autoRedirect = false
 
@@ -41,7 +42,7 @@ function RedirectWhenDone() {
 
 function ChatPage() {
 
-  const runtime = FirstChatAPIRuntime()
+  const runtime = FirstChatAPIRuntime(compositeAttachmentAdapter)
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>

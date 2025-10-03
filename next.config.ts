@@ -15,6 +15,18 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'http', // or 'https'
+        hostname: '**', // This allows all hostnames, use with caution
+        port: '',
+        pathname: '**',
+      },
+      {
+        protocol: 'https', // or 'https'
+        hostname: '**', // This allows all hostnames, use with caution
+        port: '',
+        pathname: '**',
+      }
     ],
   },
   eslint: {

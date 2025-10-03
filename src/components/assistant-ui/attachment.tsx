@@ -25,6 +25,7 @@ import {
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import { cn } from "@/lib/utils";
+import { getAttachmentBlobUrl } from "@/lib/integration/client/attachment";
 
 const useFileSrc = (file: File | undefined) => {
   const [src, setSrc] = useState<string | undefined>(undefined);
@@ -47,6 +48,8 @@ const useFileSrc = (file: File | undefined) => {
 };
 
 const useAttachmentSrc = () => {
+  const [resolvedSrc, setResolvedSrc] = useState<string | undefined>(undefined);
+  
   const { file, src } = useAssistantState(
     useShallow(({ attachment }): { file?: File; src?: string } => {
       if (attachment.type !== "image") return {};
@@ -54,11 +57,54 @@ const useAttachmentSrc = () => {
       const src = attachment.content?.filter((c) => c.type === "image")[0]
         ?.image;
       if (!src) return {};
+
       return { src };
     }),
   );
 
-  return useFileSrc(file) ?? src;
+  const fileSrc = useFileSrc(file);
+
+  useEffect(() => {
+    // If we have a file object, use its object URL
+    if (fileSrc) {
+      setResolvedSrc(fileSrc);
+      return;
+    }
+
+    // If no src, clear resolved src
+    if (!src) {
+      setResolvedSrc(undefined);
+      return;
+    }
+
+    // Check if it's a file:// URL and resolve it
+    if (src.startsWith('file://')) {
+      let isCancelled = false;
+      
+      getAttachmentBlobUrl(src)
+        .then((blobUrl) => {
+          if (!isCancelled) {
+            setResolvedSrc(blobUrl);
+          }
+        })
+        .catch((error) => {
+          console.error('Failed to resolve file:// URL:', error);
+          if (!isCancelled) {
+            // Fallback to original src on error
+            setResolvedSrc(src);
+          }
+        });
+
+      return () => {
+        isCancelled = true;
+      };
+    } else {
+      // For http://, https://, or data: URLs, use directly
+      setResolvedSrc(src);
+    }
+  }, [fileSrc, src]);
+
+  return resolvedSrc;
 };
 
 type AttachmentPreviewProps = {
@@ -67,8 +113,9 @@ type AttachmentPreviewProps = {
 
 const AttachmentPreview: FC<AttachmentPreviewProps> = ({ src }) => {
   const [isLoaded, setIsLoaded] = useState(false);
+  
   return (
-    <Image
+    <img
       src={src}
       alt="Image Preview"
       width={1}
@@ -78,8 +125,7 @@ const AttachmentPreview: FC<AttachmentPreviewProps> = ({ src }) => {
           ? "aui-attachment-preview-image-loaded block h-auto max-h-[80vh] w-auto max-w-full object-contain"
           : "aui-attachment-preview-image-loading hidden"
       }
-      onLoadingComplete={() => setIsLoaded(true)}
-      priority={false}
+      onLoad={() => setIsLoaded(true)}
     />
   );
 };

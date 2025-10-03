@@ -5,6 +5,7 @@ import { Thread } from "@/components/assistant-ui/thread";
 import { AssistantRuntimeProvider, ThreadHistoryAdapter } from '@assistant-ui/react';
 import { useParams } from 'next/navigation';
 import { ChatWithConversationIDAPIRuntime, LoadConversationHistory } from '@/lib/integration/client/chat-conversation';
+import { compositeAttachmentAdapter } from '@/lib/integration/client/attachment';
 
 function ChatPage() {
   const params = useParams()
@@ -53,7 +54,7 @@ function ChatPage() {
     },
   }
 
-  const runtime = ChatWithConversationIDAPIRuntime(conversationId, HistoryAdapter)
+  const runtime = ChatWithConversationIDAPIRuntime(conversationId, HistoryAdapter, compositeAttachmentAdapter)
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
