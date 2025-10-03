@@ -19,6 +19,7 @@ from langchain_core.messages.utils import (
 from .tools import AVAILABLE_TOOLS
 from .model import model
 from utils.langgraph_content import sanitize_and_validate_messages
+from lib.langgraph import change_file_to_url
 
 class AgentState(TypedDict):
     """State for the agent graph."""
@@ -68,6 +69,11 @@ def call_model(state: AgentState, config = None) -> Dict[str, List[BaseMessage]]
 
     # Sanitize and validate messages to ensure proper tool call/response pairing
     messages = sanitize_and_validate_messages(messages)
+    
+    # Convert file://{id} URLs to temporary blob URLs with SAS tokens
+    messages = change_file_to_url(messages)
+
+    print(messages)
 
     system_prompt = """
 # Your Role

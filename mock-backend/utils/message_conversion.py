@@ -68,26 +68,45 @@ def from_assistant_ui_contents_to_langgraph_contents(message: list[any]) -> dict
             })
             continue
 
-        if content.get("type") == "file":
-            file_data = decode_file_attachment(content.get("data"))
-            langgrapH_content = {
-                "type": "file",
-                "source_type": "base64",
-                "filename": file_data["filename"],
-                "mime_type": file_data["mimetype"],
-                "data": file_data["base64data"]
-            }
-            langgraph_contents.append(langgrapH_content)
-            continue
+        # Currently didn;t support file type
+        # if content.get("type") == "file":
+        #     file_data = decode_file_attachment(content.get("data"))
+        #     langgrapH_content = {
+        #         "type": "file",
+        #         "source_type": "base64",
+        #         "filename": file_data["filename"],
+        #         "mime_type": file_data["mimetype"],
+        #         "data": file_data["base64data"]
+        #     }
+        #     langgraph_contents.append(langgrapH_content)
+        #     continue
 
         if content.get("type") == "image":
-            file_data = decode_file_attachment(content.get("image"))
-            langgraph_content = {
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:{file_data['mimetype']};base64,{file_data['base64data']}",
-                },
-            }
+            image_data = content.get("image", "")
+            
+            # Check the format of the image data
+            if image_data.startswith("data:"):
+                # Base64 data URL format - decode it
+                file_data = decode_file_attachment(image_data)
+                langgraph_content = {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:{file_data['mimetype']};base64,{file_data['base64data']}",
+                    },
+                }
+            elif image_data.startswith("file://") or image_data.startswith("https://") or image_data.startswith("http://"):
+                # file:// or https:// URL format - use directly
+                langgraph_content = {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": image_data,
+                    },
+                }
+            else:
+                # Unknown format - skip or log warning
+                print(f"Warning: Unknown image format: {image_data[:50]}...")
+                continue
+            
             langgraph_contents.append(langgraph_content)
             continue
     
