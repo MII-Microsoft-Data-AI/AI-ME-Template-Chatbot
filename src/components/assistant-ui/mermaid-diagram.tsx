@@ -3,7 +3,7 @@
 import { useMessagePart } from "@assistant-ui/react";
 import type { SyntaxHighlighterProps } from "@assistant-ui/react-markdown";
 import mermaid from "mermaid";
-import { FC, useEffect, useRef } from "react";
+import { FC, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -44,6 +44,7 @@ export const MermaidDiagram: FC<MermaidDiagramProps> = ({
   language: _language,
 }) => {
   const ref = useRef<HTMLPreElement>(null);
+  const [Placeholder, setPlaceholder] = useState("Drawing diagram...");
 
   // Detect when this code block is complete
   const isComplete = useMessagePart((part) => {
@@ -69,12 +70,19 @@ export const MermaidDiagram: FC<MermaidDiagramProps> = ({
     (async () => {
       try {
         const id = `mermaid-${Math.random().toString(36).slice(2)}`;
+        await mermaid.parse(code);
         const result = await mermaid.render(id, code);
+        if (!result || !result.svg) {
+          console.warn("Mermaid did not return any SVG output");
+          setPlaceholder("Failed to render diagram, please try again.");
+          return;
+        }
         if (ref.current) {
           ref.current.innerHTML = result.svg;
           result.bindFunctions?.(ref.current);
         }
       } catch (e) {
+        setPlaceholder("Failed to render diagram, please try the prompt again.");
         console.warn("Failed to render Mermaid diagram:", e);
       }
     })();
@@ -88,7 +96,7 @@ export const MermaidDiagram: FC<MermaidDiagramProps> = ({
         className,
       )}
     >
-      Drawing diagram...
+      {Placeholder}
     </pre>
   );
 };
