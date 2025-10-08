@@ -5,6 +5,7 @@ import {
   ErrorPrimitive,
   MessagePrimitive,
   ThreadPrimitive,
+  useAssistantApi,
   useAssistantState,
 } from "@assistant-ui/react";
 import {
@@ -17,6 +18,8 @@ import {
   PencilIcon,
   RefreshCwIcon,
   Square,
+  ThumbsDown,
+  ThumbsUp,
 } from "lucide-react";
 import type { FC } from "react";
 
@@ -40,6 +43,8 @@ const Settings = {
   attachments: true,
   editMessages: false, // Currently we dont support editing user messages
   regenerate: false, // Currently we dont support regenerating assistant messages
+  thumbsUp: true, // Currently we dont support thumbs up/down for messages
+  thumbsDown: true, // Currently we dont support thumbs up/down for messages
 }
 
 interface ThreadProps {
@@ -230,10 +235,26 @@ interface ComposerProps {
 }
 
 const Composer: FC<ComposerProps> = ({ isDisabled = false }) => {
-
+  const api = useAssistantApi();
   const threadExist = useAssistantState(({thread}) => thread.messages.length > 0)
   const text = useAssistantState(({composer}) => composer.text)
   const isEmpty = text.trim().length < 1
+
+  const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const threadCapabilities = api.thread().getState().capabilities;
+    const files = Array.from(e.clipboardData?.files || []);
+
+    if (threadCapabilities.attachments && files.length > 0) {
+      try {
+        e.preventDefault();
+        await Promise.all(
+          files.map((file) => api.composer().addAttachment(file)),
+        );
+      } catch (error) {
+        console.error("Error adding attachment:", error);
+      }
+    }
+  }
 
   return (
     <div className="aui-composer-wrapper sticky bottom-0 mx-auto flex w-full max-w-[var(--thread-max-width)] flex-col gap-4 overflow-visible rounded-t-3xl bg-background pb-2 md:pb-4">
@@ -257,6 +278,8 @@ const Composer: FC<ComposerProps> = ({ isDisabled = false }) => {
             autoFocus={!isDisabled}
             aria-label="Message input"
             disabled={isDisabled}
+            addAttachmentOnPaste
+            onPaste={handlePaste}
             />
           <ComposerAction isDisabled={isDisabled || isEmpty} />
         </ComposerPrimitive.Root>
@@ -376,14 +399,30 @@ const AssistantActionBar: FC = () => {
           </MessagePrimitive.If>
         </TooltipIconButton>
       </ActionBarPrimitive.Copy>
-      <ActionBarPrimitive.Reload asChild>
         {
           Settings.regenerate &&
-          <TooltipIconButton tooltip="Refresh">
-            <RefreshCwIcon />
-          </TooltipIconButton>
+          <ActionBarPrimitive.Reload asChild>
+            <TooltipIconButton tooltip="Refresh">
+              <RefreshCwIcon />
+            </TooltipIconButton>
+          </ActionBarPrimitive.Reload>
         }
-      </ActionBarPrimitive.Reload>
+      {
+        Settings.thumbsUp &&
+        <ActionBarPrimitive.FeedbackPositive asChild>
+          <TooltipIconButton tooltip="Thumbs up" className="">
+            <ThumbsUp />
+          </TooltipIconButton>
+        </ActionBarPrimitive.FeedbackPositive>
+      }
+      {
+        Settings.thumbsDown &&
+        <ActionBarPrimitive.FeedbackNegative asChild>
+          <TooltipIconButton tooltip="Thumbs up" className="">
+            <ThumbsDown />
+          </TooltipIconButton>
+        </ActionBarPrimitive.FeedbackNegative>
+      }
     </ActionBarPrimitive.Root>
   );
 };
@@ -405,11 +444,7 @@ const UserMessage: FC = () => {
             <MessagePrimitive.Parts />
           </div>
           <div className="aui-user-action-bar-wrapper absolute top-1/2 left-0 -translate-x-full -translate-y-1/2 pr-2">
-
-          {
-            Settings.editMessages &&
             <UserActionBar /> 
-          }
           </div>
         </div>
 
@@ -426,11 +461,14 @@ const UserActionBar: FC = () => {
       autohide="not-last"
       className="aui-user-action-bar-root flex flex-col items-end"
     >
-      <ActionBarPrimitive.Edit asChild>
-        <TooltipIconButton tooltip="Edit" className="aui-user-action-edit p-4">
-          <PencilIcon />
-        </TooltipIconButton>
-      </ActionBarPrimitive.Edit>
+      {
+        Settings.editMessages &&
+        <ActionBarPrimitive.Edit asChild>
+          <TooltipIconButton tooltip="Edit" className="aui-user-action-edit p-4">
+            <PencilIcon />
+          </TooltipIconButton>
+        </ActionBarPrimitive.Edit>
+      }
     </ActionBarPrimitive.Root>
   );
 };
