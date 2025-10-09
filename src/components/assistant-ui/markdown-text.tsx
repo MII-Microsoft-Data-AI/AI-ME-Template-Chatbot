@@ -23,6 +23,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import rehypeRaw from "rehype-raw";
 import { CustomDocReference, CustomLinkReference } from "./custom-markdown";
+import { div } from "motion/react-m";
 
 
 function normalizeCustomMathTags(input: string): string {
@@ -205,13 +206,15 @@ const defaultComponents = memoizeMarkdownComponents({
     <hr className={cn("aui-md-hr my-5 border-b", className)} {...props} />
   ),
   table: ({ className, ...props }) => (
-    <table
+    <div className="max-w-[var(--thread-max-width)] overflow-x-scroll">
+      <table
+      {...props}
       className={cn(
-        "aui-md-table my-5 w-full border-separate border-spacing-0 overflow-y-auto",
+        "aui-md-table my-5 border-separate border-spacing-0 overflow-y-auto w-full",
         className,
       )}
-      {...props}
-    />
+      />
+    </div>
   ),
   th: ({ className, ...props }) => (
     <th
