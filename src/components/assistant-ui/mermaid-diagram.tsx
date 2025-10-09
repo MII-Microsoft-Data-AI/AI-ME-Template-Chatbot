@@ -92,22 +92,6 @@ export const MermaidDiagram: FC<MermaidDiagramProps> = ({
     })();
   }, [isComplete, code]);
 
-  const toggleFullscreen = () => {
-    if (!containerRef.current) return;
-
-    if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen().then(() => {
-        setIsFullscreen(true);
-      }).catch((err) => {
-        console.error("Error attempting to enable fullscreen:", err);
-      });
-    } else {
-      document.exitFullscreen().then(() => {
-        setIsFullscreen(false);
-      });
-    }
-  };
-
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
@@ -159,25 +143,17 @@ export const MermaidDiagram: FC<MermaidDiagramProps> = ({
               >
                 <Locate className="h-4 w-4" />
               </button>
-              <button
-                onClick={toggleFullscreen}
-                className="rounded bg-background/90 p-2 shadow-md hover:bg-background transition-colors border"
-                title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-                aria-label={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-              >
-                {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
-              </button>
             </div>
 
             {/* Diagram Container */}
             <TransformComponent
-              wrapperClass="!w-full !h-auto"
-              contentClass="!w-auto !h-auto !mx-auto"
+              wrapperClass="!w-full !h-full"
+              contentClass="!w-auto !h-full !mx-auto"
             >
               <pre
                 ref={ref}
                 className={cn(
-                  "aui-mermaid-diagram rounded-b-lg text-center [&_svg]:mx-auto w-full h-full",
+                  "aui-mermaid-diagram rounded-b-lg text-center [&_svg]:mx-auto w-full h-full min-h-48",
                   className,
                 )}
               >
