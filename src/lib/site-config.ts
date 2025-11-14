@@ -96,6 +96,19 @@ export const siteConfig: SiteConfig = {
         order: 2
       },
       {
+        id: 'attachments',
+        label: 'My Attachments',
+        path: '/attachments',
+        icon: {
+          name: 'attachment',
+          svg: 'M15.172 7.172a4 4 0 11-5.656 0m0 0a4 4 0 015.656 0m0 0l2.828-2.828a2 2 0 11-2.828 2.828L9.172 9.172m0 0l-2.828 2.828'
+        },
+        description: 'View and manage your attachments',
+        showInSidebar: false,
+        showInMenu: true,
+        order: 2.5
+      },
+      {
         id: 'settings',
         label: 'Settings',
         path: '/settings',
@@ -135,6 +148,19 @@ export const siteConfig: SiteConfig = {
         showInSidebar: false,
         showInMenu: true,
         order: 2
+      },
+      {
+        id: 'attachments',
+        label: 'My Attachments',
+        path: '/attachments',
+        icon: {
+          name: 'attachment',
+          svg: 'M15.172 7.172a4 4 0 11-5.656 0m0 0a4 4 0 015.656 0m0 0l2.828-2.828a2 2 0 11-2.828 2.828L9.172 9.172m0 0l-2.828 2.828'
+        },
+        description: 'View and manage your attachments',
+        showInSidebar: false,
+        showInMenu: true,
+        order: 2.5
       },
       {
         id: 'settings',

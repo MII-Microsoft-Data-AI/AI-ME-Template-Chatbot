@@ -36,7 +36,9 @@ class Attachment:
     userid: str
     filename: str
     blob_name: str # Azure blob storage name
+    type: str # File type/MIME type
     created_at: int  # epoch timestamp
+    metadata: Optional[Dict[str, Any]] = None  # JSON metadata
 
 
 class DatabaseManager:
@@ -136,6 +138,8 @@ class DatabaseManager:
                     userid TEXT NOT NULL,
                     filename TEXT NOT NULL,
                     blob_name TEXT NOT NULL,
+                    type TEXT NOT NULL,
+                    metadata TEXT,
                     created_at INTEGER NOT NULL
                 )
             """)
@@ -151,6 +155,19 @@ class DatabaseManager:
                 CREATE INDEX IF NOT EXISTS idx_attachments_created_at 
                 ON attachments(created_at DESC)
             """)
+            
+            # Add type and metadata columns if they don't exist (for existing databases)
+            try:
+                conn.execute("ALTER TABLE attachments ADD COLUMN type TEXT NOT NULL DEFAULT 'unknown'")
+            except sqlite3.OperationalError:
+                # Column already exists
+                pass
+            
+            try:
+                conn.execute("ALTER TABLE attachments ADD COLUMN metadata TEXT")
+            except sqlite3.OperationalError:
+                # Column already exists
+                pass
             
             conn.commit()
     
@@ -401,15 +418,17 @@ class DatabaseManager:
             
             return row is not None
         
-    def create_attachment(self, attachment_id: str, userid: str, filename: str, blob_name: str) -> Attachment:
+    def create_attachment(self, attachment_id: str, userid: str, filename: str, blob_name: str, attachment_type: str = "unknown", metadata: Optional[Dict[str, Any]] = None) -> Attachment:
         """Create a new attachment entry."""
+        import json
         created_at = int(time.time())
+        metadata_json = json.dumps(metadata) if metadata else None
         
         with self.get_connection() as conn:
             conn.execute("""
-                INSERT INTO attachments (id, userid, filename, blob_name, created_at)
-                VALUES (?, ?, ?, ?, ?)
-            """, (attachment_id, userid, filename, blob_name, created_at))
+                INSERT INTO attachments (id, userid, filename, blob_name, type, metadata, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (attachment_id, userid, filename, blob_name, attachment_type, metadata_json, created_at))
             conn.commit()
         
         return Attachment(
@@ -417,33 +436,40 @@ class DatabaseManager:
             userid=userid,
             filename=filename,
             blob_name=blob_name,
-            created_at=created_at
+            type=attachment_type,
+            created_at=created_at,
+            metadata=metadata
         )
     
     def get_attachment(self, attachment_id: str) -> Optional[Attachment]:
         """Get attachment by ID."""
+        import json
         with self.get_connection() as conn:
             row = conn.execute("""
-                SELECT id, userid, filename, blob_name, created_at
+                SELECT id, userid, filename, blob_name, type, metadata, created_at
                 FROM attachments 
                 WHERE id = ?
             """, (attachment_id,)).fetchone()
             
             if row:
+                metadata = json.loads(row['metadata']) if row['metadata'] else None
                 return Attachment(
                     id=row['id'],
                     userid=row['userid'],
                     filename=row['filename'],
                     blob_name=row['blob_name'],
-                    created_at=row['created_at']
+                    type=row['type'],
+                    created_at=row['created_at'],
+                    metadata=metadata
                 )
         return None
     
     def get_user_attachments(self, userid: str) -> List[Attachment]:
         """Get all attachments for a user, ordered by created_at descending."""
+        import json
         with self.get_connection() as conn:
             rows = conn.execute("""
-                SELECT id, userid, filename, blob_name, created_at
+                SELECT id, userid, filename, blob_name, type, metadata, created_at
                 FROM attachments 
                 WHERE userid = ? 
                 ORDER BY created_at DESC
@@ -455,10 +481,39 @@ class DatabaseManager:
                     userid=row['userid'],
                     filename=row['filename'],
                     blob_name=row['blob_name'],
-                    created_at=row['created_at']
+                    type=row['type'],
+                    created_at=row['created_at'],
+                    metadata=json.loads(row['metadata']) if row['metadata'] else None
                 )
                 for row in rows
             ]
+    
+    def update_attachment_metadata(self, attachment_id: str, metadata: Optional[Dict[str, Any]]) -> bool:
+        """Update attachment metadata."""
+        import json
+        metadata_json = json.dumps(metadata) if metadata else None
+        
+        with self.get_connection() as conn:
+            cursor = conn.execute("""
+                UPDATE attachments 
+                SET metadata = ?
+                WHERE id = ?
+            """, (metadata_json, attachment_id))
+            conn.commit()
+            
+            return cursor.rowcount > 0
+    
+    def update_attachment_type(self, attachment_id: str, attachment_type: str) -> bool:
+        """Update attachment type."""
+        with self.get_connection() as conn:
+            cursor = conn.execute("""
+                UPDATE attachments 
+                SET type = ?
+                WHERE id = ?
+            """, (attachment_type, attachment_id))
+            conn.commit()
+            
+            return cursor.rowcount > 0
     
     def delete_attachment(self, attachment_id: str) -> bool:
         """Delete an attachment."""

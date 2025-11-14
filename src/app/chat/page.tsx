@@ -4,8 +4,8 @@ import React, {useState, useEffect} from 'react'
 import { Thread } from "@/components/assistant-ui/thread";
 import { AssistantRuntimeProvider, useAssistantState } from '@assistant-ui/react';
 import { useRouter } from 'next/navigation';
-import { FirstChatAPIRuntime, GetLastConversationId } from '@/lib/integration/client/chat-conversation';
-import { compositeAttachmentAdapter } from '@/lib/integration/client/attachment';
+import { GetLastConversationId } from '@/lib/integration/client/chat/chat-conversation';
+import { useChatRuntime } from '@/lib/integration/client/chat/chat-runtime';
 
 const autoRedirect = false
 
@@ -42,7 +42,7 @@ function RedirectWhenDone() {
 
 function ChatPage() {
 
-  const runtime = FirstChatAPIRuntime(compositeAttachmentAdapter)
+  const {runtime} = useChatRuntime()
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>

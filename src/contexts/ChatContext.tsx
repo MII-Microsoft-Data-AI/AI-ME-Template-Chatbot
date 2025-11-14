@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react'
 import { formatRelativeTime } from '@/utils/date-utils'
 import { useSession } from 'next-auth/react'
-import { DeleteConversation, GetConversationsList, TogglePinConversation, RenameConversation } from '@/lib/integration/client/chat-conversation'
+import { DeleteConversation, GetConversationsList, TogglePinConversation, RenameConversation } from '@/lib/integration/client/chat/chat-conversation'
 
 interface ChatItem {
   id: string

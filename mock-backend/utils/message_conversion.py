@@ -58,6 +58,7 @@ def from_assistant_ui_contents_to_langgraph_contents(message: list[any]) -> dict
                 }
             elif image_data.startswith("file://") or image_data.startswith("https://") or image_data.startswith("http://"):
                 # file:// or https:// URL format - use directly
+                # For file:// URLs, Langgraph will handle conversion to blob URL later
                 langgraph_content = {
                     "type": "image_url",
                     "image_url": {

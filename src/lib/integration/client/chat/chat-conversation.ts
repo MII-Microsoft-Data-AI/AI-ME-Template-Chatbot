@@ -1,20 +1,11 @@
 'use client'
 
-import { AttachmentAdapter, ThreadHistoryAdapter, ThreadMessage } from "@assistant-ui/react";
+import {  ThreadMessage } from "@assistant-ui/react";
 import { formatRelativeTime } from "@/utils/date-utils";
 import { loadFromLanggraphStateHistoryJSON } from "@/utils/langgraph/to-assistant-ui";
-import { useCustomDataStreamRuntime } from "@/utils/custom-data-stream-runtime";
 
 const BaseAPIPath = "/api/be"
 
-
-// First Chat API Runtime (without conversation ID parameters)
-export const FirstChatAPIRuntime = (attachmentAdapter: AttachmentAdapter) => useCustomDataStreamRuntime({
-  api: `${BaseAPIPath}/chat`,
-  adapters: {
-    attachments: attachmentAdapter,
-  }
-})
 
 // Get Last Conversation ID from A User
 // The userid is obtained from the session in the backend
@@ -36,21 +27,11 @@ export async function GetLastConversationId(): Promise<string | null> {
   }
 }
 
-// Chat API Runtime with Conversation ID parameters
-// You need to provide the conversationId and historyAdapter
-// The conversationId is obtained from the URL parameters
-// The historyAdapter is used to load and append messages to the thread
-export const ChatWithConversationIDAPIRuntime = (conversationId: string, historyAdapter: ThreadHistoryAdapter, attachmentAdapter: AttachmentAdapter) => useCustomDataStreamRuntime({
-  api: `${BaseAPIPath}/conversations/${conversationId}/chat`,
-  adapters: {
-    history: historyAdapter,
-    attachments: attachmentAdapter,
-  },
-})
-
 type LoadHistoryResponseType = { message: ThreadMessage, parentId: string | null }[] | null
 
 export const LoadConversationHistory = async (conversationId: string): Promise<LoadHistoryResponseType> => {
+
+  console.log("Loading conversation history for ID:", conversationId)
 
   const response = await fetch(`${BaseAPIPath}/conversations/${conversationId}`, {
     method: 'GET',
