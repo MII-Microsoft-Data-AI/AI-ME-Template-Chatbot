@@ -201,3 +201,29 @@ def pin_conversation(userid: Annotated[str | None, Header()] = None, conversatio
     
     action = "pinned" if updated else "unpinned"
     return {"message": f"Conversation {action} successfully"}
+
+
+class RenameRequest(BaseModel):
+    new_title: str
+
+@chat_conversation_route.post("/conversations/{conversation_id}/rename")
+def rename_conversation(userid: Annotated[str | None, Header()] = None, conversation_id: str = "", request: RenameRequest = None):
+    """Rename a conversation."""
+
+    if not userid:
+        return {"error": "Missing userid header"}
+    
+    if not request or not request.new_title or request.new_title.strip() == "":
+        return {"error": "new_title cannot be empty"}
+    
+    existing_data = db_manager.get_conversation(conversation_id, userid)
+    if not existing_data:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    # Update the conversation title in the database
+    updated = db_manager.update_conversation_title(conversation_id, userid, request.new_title.strip())
+    
+    if not updated:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    return {"message": "Conversation renamed successfully", "new_title": request.new_title.strip()}

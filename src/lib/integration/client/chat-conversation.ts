@@ -148,3 +148,21 @@ export const DeleteConversation = async (conversationId: string) => {
   }
   return true
 }
+
+export const RenameConversation = async (conversationId: string, newTitle: string) => {
+  const response = await fetch(`${BaseAPIPath}/conversations/${conversationId}/rename`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ 
+      new_title: newTitle
+    }),
+  });
+  
+  if (!response.ok) {
+    console.error('Failed to rename conversation')
+    return false
+  }
+  return true
+}

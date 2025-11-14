@@ -238,6 +238,18 @@ class DatabaseManager:
             
             return cursor.rowcount > 0
     
+    def update_conversation_title(self, conversation_id: str, userid: str, new_title: str) -> bool:
+        """Update the title of a conversation."""
+        with self.get_connection() as conn:
+            cursor = conn.execute("""
+                UPDATE conversations 
+                SET title = ? 
+                WHERE id = ? AND userid = ?
+            """, (new_title, conversation_id, userid))
+            conn.commit()
+            
+            return cursor.rowcount > 0
+    
     def update_conversation_last_used(self, conversation_id: str, userid: str) -> bool:
         """Update the last_used_at timestamp for a conversation."""
         last_used_at = int(time.time())

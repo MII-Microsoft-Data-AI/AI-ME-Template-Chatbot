@@ -161,8 +161,6 @@ If you cannot find supporting documents: explicitly say "No matching documents f
 ## Using SQLITE checkpointer for simplicity
 db = sqlite3.connect("mock.db", check_same_thread=False)
 checkpointer = SqliteSaver(db)
-## Testing: Using CosmosDB checkpointer
-# saver = CosmosDBSaver(database_name=os.getenv("COSMOSDB_DATABASE_NAME"), container_name=os.getenv("COSMOSDB_CONTAINER_NAME"))
 
 # Create the graph
 workflow = StateGraph(AgentState)

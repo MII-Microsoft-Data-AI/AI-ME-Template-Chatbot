@@ -24,11 +24,34 @@ interface ChatGroupProps {
   onChatClick: (chatId: string) => void
   onTogglePin?: (chatId: string) => Promise<void>
   onDeleteChat?: (chatId: string) => Promise<void>
+  onRenameChat?: (chatId: string, newTitle: string) => Promise<void>
   isCollapsed?: boolean
   isMobile?: boolean
 }
 
-function ChatGroup({ title, chats, onChatClick, onTogglePin, onDeleteChat, isCollapsed = false, isMobile = false }: ChatGroupProps) {
+function ChatGroup({ title, chats, onChatClick, onTogglePin, onDeleteChat, onRenameChat, isCollapsed = false, isMobile = false }: ChatGroupProps) {
+  const [editingChatId, setEditingChatId] = useState<string | null>(null)
+  const [editingTitle, setEditingTitle] = useState('')
+
+  const handleRenameClick = (e: React.MouseEvent, chatId: string, currentTitle: string) => {
+    e.stopPropagation()
+    setEditingChatId(chatId)
+    setEditingTitle(currentTitle)
+  }
+
+  const handleRenameSubmit = async (chatId: string) => {
+    if (editingTitle.trim() && editingTitle !== chats.find(c => c.id === chatId)?.title && onRenameChat) {
+      await onRenameChat(chatId, editingTitle.trim())
+    }
+    setEditingChatId(null)
+    setEditingTitle('')
+  }
+
+  const handleRenameCancel = () => {
+    setEditingChatId(null)
+    setEditingTitle('')
+  }
+
   if (chats.length === 0) return null
 
   if (isCollapsed) {
@@ -67,63 +90,119 @@ function ChatGroup({ title, chats, onChatClick, onTogglePin, onDeleteChat, isCol
       <div className="space-y-1">
         {chats.map((chat) => (
           <div key={chat.id} className={isMobile ? "group" : ""}>
-            <div
-              className={`flex items-center justify-between p-3 hover:bg-gray-200 rounded-lg cursor-pointer transition-colors ${isMobile ? "" : "group"}`}
-              onClick={() => onChatClick(chat.id)}
-            >
-              <div className="flex items-center space-x-3 flex-1 min-w-0">
-                {isMobile && (
-                  <div className="relative">
-                    <svg className="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.418 8-9.883 8a9.864 9.864 0 01-4.601-1.139L3 21l2.139-3.516C4.381 16.275 4 14.193 4 12c0-4.418 4.477-8 10-8s10 3.582 10 8z" />
-                    </svg>
-                    {chat.isPinned && (
-                      <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-400 rounded-full"></div>
-                    )}
-                  </div>
-                )}
-                <div className="flex items-center space-x-2 flex-1 min-w-0">
-                  {!isMobile && chat.isPinned && (
-                    <svg className="w-3 h-3 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z" />
-                    </svg>
+            {editingChatId === chat.id ? (
+              <div className="flex items-center space-x-2 p-3">
+                <input
+                  type="text"
+                  value={editingTitle}
+                  onChange={(e) => setEditingTitle(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleRenameSubmit(chat.id)
+                    } else if (e.key === 'Escape') {
+                      handleRenameCancel()
+                    }
+                  }}
+                  autoFocus
+                  className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  style={{ color: 'var(--foreground)' }}
+                />
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleRenameSubmit(chat.id)
+                  }}
+                  className="text-gray-500 hover:text-green-600 p-1 transition-all"
+                  title="Save"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleRenameCancel()
+                  }}
+                  className="text-gray-500 hover:text-red-600 p-1 transition-all"
+                  title="Cancel"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ) : (
+              <div
+                className={`flex items-center justify-between p-3 hover:bg-gray-200 rounded-lg cursor-pointer transition-colors ${isMobile ? "" : "group"}`}
+                onClick={() => onChatClick(chat.id)}
+              >
+                <div className="flex items-center space-x-3 flex-1 min-w-0">
+                  {isMobile && (
+                    <div className="relative">
+                      <svg className="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.418 8-9.883 8a9.864 9.864 0 01-4.601-1.139L3 21l2.139-3.516C4.381 16.275 4 14.193 4 12c0-4.418 4.477-8 10-8s10 3.582 10 8z" />
+                      </svg>
+                      {chat.isPinned && (
+                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-400 rounded-full"></div>
+                      )}
+                    </div>
                   )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate" style={{ color: 'var(--foreground)' }}>{chat.title}</p>
-                    {isMobile && <p className="text-xs text-gray-500">{chat.date}</p>}
-                    {!isMobile && <p className="text-xs text-gray-500 mt-1">{chat.date}</p>}
+                  <div className="flex items-center space-x-2 flex-1 min-w-0">
+                    {!isMobile && chat.isPinned && (
+                      <svg className="w-3 h-3 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z" />
+                      </svg>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate" style={{ color: 'var(--foreground)' }}>{chat.title}</p>
+                      {isMobile && <p className="text-xs text-gray-500">{chat.date}</p>}
+                      {!isMobile && <p className="text-xs text-gray-500 mt-1">{chat.date}</p>}
+                    </div>
                   </div>
                 </div>
+                <div className="flex items-center space-x-1">
+                  {onRenameChat && (
+                    <button
+                      onClick={(e) => handleRenameClick(e, chat.id, chat.title)}
+                      className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-blue-500 p-1 transition-all"
+                      title="Rename chat"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                  )}
+                  {onTogglePin && (
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        await onTogglePin(chat.id)
+                      }}
+                      className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-yellow-500 p-1 transition-all"
+                      title={chat.isPinned ? "Unpin chat" : "Pin chat"}
+                    >
+                      <svg className="w-4 h-4" fill={chat.isPinned ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                      </svg>
+                    </button>
+                  )}
+                  {
+                    onDeleteChat &&
+                    <button
+                      onClick={async (e) => {e.stopPropagation(); await onDeleteChat(chat.id)}}
+                      className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-700 p-1 transition-all"
+                      title="Delete chat"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  }
+                </div>
               </div>
-              <div className="flex items-center space-x-1">
-                {onTogglePin && (
-                  <button
-                    onClick={async (e) => {
-                      e.stopPropagation()
-                      await onTogglePin(chat.id)
-                    }}
-                    className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-yellow-500 p-1 transition-all"
-                    title={chat.isPinned ? "Unpin chat" : "Pin chat"}
-                  >
-                    <svg className="w-4 h-4" fill={chat.isPinned ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                    </svg>
-                  </button>
-                )}
-                {
-                  onDeleteChat &&
-                  <button
-                    onClick={async (e) => {e.stopPropagation(); await onDeleteChat(chat.id)}}
-                    className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-700 p-1 transition-all"
-                    title="Delete chat"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                }
-              </div>
-            </div>
+            )}
           </div>
         ))}
       </div>
@@ -135,7 +214,7 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isPinned, setIsPinned] = useState(false)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
-  const { getGroupedChatHistory, togglePinChat, deleteChat, isInitialLoading } = useChat()
+  const { getGroupedChatHistory, togglePinChat, deleteChat, renameChat, isInitialLoading } = useChat()
   const { showConfirmation } = useModal()
   const router = useRouter()
   const pathname = usePathname()
@@ -314,12 +393,12 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
                   </>
                 ) : (
                   <>
-                    <ChatGroup title="Pinned" chats={groupedChats.pinned} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} isMobile={true} />
-                    <ChatGroup title="Today" chats={groupedChats.today} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} isMobile={true} />
-                    <ChatGroup title="Yesterday" chats={groupedChats.yesterday} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} isMobile={true} />
-                    <ChatGroup title="Previous 7 Days" chats={groupedChats.previous7Days} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} isMobile={true} />
-                    <ChatGroup title="Previous 30 Days" chats={groupedChats.previous30Days} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} isMobile={true} />
-                    <ChatGroup title="Older" chats={groupedChats.older} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} isMobile={true} />
+                    <ChatGroup title="Pinned" chats={groupedChats.pinned} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} onRenameChat={renameChat} isMobile={true} />
+                    <ChatGroup title="Today" chats={groupedChats.today} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} onRenameChat={renameChat} isMobile={true} />
+                    <ChatGroup title="Yesterday" chats={groupedChats.yesterday} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} onRenameChat={renameChat} isMobile={true} />
+                    <ChatGroup title="Previous 7 Days" chats={groupedChats.previous7Days} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} onRenameChat={renameChat} isMobile={true} />
+                    <ChatGroup title="Previous 30 Days" chats={groupedChats.previous30Days} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} onRenameChat={renameChat} isMobile={true} />
+                    <ChatGroup title="Older" chats={groupedChats.older} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} onRenameChat={renameChat} isMobile={true} />
                   </>
                 )}
               </div>
@@ -428,12 +507,12 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
               </>
             ) : (
               <>
-                <ChatGroup title="Pinned" chats={groupedChats.pinned} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} />
-                <ChatGroup title="Today" chats={groupedChats.today} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} />
-                <ChatGroup title="Yesterday" chats={groupedChats.yesterday} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} />
-                <ChatGroup title="Previous 7 Days" chats={groupedChats.previous7Days} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} />
-                <ChatGroup title="Previous 30 Days" chats={groupedChats.previous30Days} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} />
-                <ChatGroup title="Older" chats={groupedChats.older} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} />
+                <ChatGroup title="Pinned" chats={groupedChats.pinned} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} onRenameChat={renameChat} />
+                <ChatGroup title="Today" chats={groupedChats.today} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} onRenameChat={renameChat} />
+                <ChatGroup title="Yesterday" chats={groupedChats.yesterday} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} onRenameChat={renameChat} />
+                <ChatGroup title="Previous 7 Days" chats={groupedChats.previous7Days} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} onRenameChat={renameChat} />
+                <ChatGroup title="Previous 30 Days" chats={groupedChats.previous30Days} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} onRenameChat={renameChat} />
+                <ChatGroup title="Older" chats={groupedChats.older} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} onRenameChat={renameChat} />
               </>
             )}
           </div>

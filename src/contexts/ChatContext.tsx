@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react'
 import { formatRelativeTime } from '@/utils/date-utils'
 import { useSession } from 'next-auth/react'
-import { DeleteConversation, GetConversationsList, TogglePinConversation } from '@/lib/integration/client/chat-conversation'
+import { DeleteConversation, GetConversationsList, TogglePinConversation, RenameConversation } from '@/lib/integration/client/chat-conversation'
 
 interface ChatItem {
   id: string
@@ -20,6 +20,7 @@ interface ChatContextType {
   getGroupedChatHistory: () => GroupedChatHistory
   togglePinChat: (chatId: string) => Promise<void>
   deleteChat: (chatId: string) => Promise<void>
+  renameChat: (chatId: string, newTitle: string) => Promise<void>
   loadConversations: () => Promise<void>
   isLoading: boolean
   isInitialLoading: boolean
@@ -291,6 +292,27 @@ export function ChatProvider({ children }: ChatProviderProps) {
     }
   }
 
+  const renameChat = async (chatId: string, newTitle: string) => {
+    try {
+      setError(null)
+      const response = await RenameConversation(chatId, newTitle)
+      if (!response) {
+        throw new Error('Failed to rename conversation')
+      }
+      // Update local state optimistically
+      setChatHistory(prevHistory =>
+        prevHistory.map(chat =>
+          chat.id === chatId
+            ? { ...chat, title: newTitle }
+            : chat
+        )
+      )
+    } catch (err) {
+      setError('Failed to rename conversation')
+      console.error('Rename conversation error:', err)
+    }
+  }
+
   const getGroupedChatHistory = () => groupChatsByDate(chatHistory)
 
   return (
@@ -300,6 +322,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
       getGroupedChatHistory,
       togglePinChat,
       deleteChat,
+      renameChat,
       loadConversations,
       isLoading,
       isInitialLoading,
