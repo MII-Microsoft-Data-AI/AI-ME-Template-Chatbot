@@ -41,7 +41,7 @@ class ChunkDetailResponse(BaseModel):
 
 
 
-@chunk_route.get("/chunk/{chunk_id}", response_model=ChunkDetailResponse)
+@chunk_route.get("/{chunk_id}", response_model=ChunkDetailResponse)
 def get_chunk_detail(
     chunk_id: str,
     credentials: HTTPBasicCredentials = Depends(security),
@@ -66,12 +66,14 @@ def get_chunk_detail(
             top=1
         ))
         
-        if not results:
+        if not results or len(results) < 1:
             raise HTTPException(status_code=404, detail="Chunk not found")
         
         chunk = results[0]
         content = chunk['content']
         metadata = dict(chunk)  # Convert to dict for response
+
+        print("MASUK SINI", chunk, content, metadata)
         
         # Extract file_id from metadata
         file_id = metadata.get('file_id')

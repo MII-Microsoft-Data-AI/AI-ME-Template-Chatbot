@@ -53,7 +53,7 @@ interface ThreadProps {
 
 export const Thread: FC<ThreadProps> = ({ isLoading = false }) => {
 
-
+  const isRunning = useAssistantState(({thread}) => thread.isRunning)
 
   return (
     <LazyMotion features={domAnimation}>
@@ -85,7 +85,7 @@ export const Thread: FC<ThreadProps> = ({ isLoading = false }) => {
             <ThreadPrimitive.If empty={isLoading}>
               <div className="aui-thread-viewport-spacer min-h-8 grow" />
             </ThreadPrimitive.If>
-            <Composer isDisabled={isLoading} />
+            <Composer isDisabled={isLoading || isRunning} />
           </ThreadPrimitive.Viewport>
         </ThreadPrimitive.Root>
       </MotionConfig>

@@ -18,13 +18,13 @@ help:
 # Development - Start both services
 
 # Start backend server
-dev-backend:
+be:
 	@echo "🔧 Starting backend server..."
 	@echo "This is not reloadable. Restart this command to apply changes."
 	cd mock-backend && uv run uvicorn main:app --host 0.0.0.0 --port 8000
 
 # Start frontend development server
-dev-frontend:
+fe:
 	@echo "⚛️  Starting frontend development server..."
 	@sleep 2 && bun run dev
 

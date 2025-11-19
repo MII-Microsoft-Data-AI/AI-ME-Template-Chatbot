@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { GetLastConversationId } from '@/lib/integration/client/chat/chat-conversation';
 import { useChatRuntime } from '@/lib/integration/client/chat/chat-runtime';
 
-const autoRedirect = false
+const autoRedirect = true
 
 function RedirectWhenDone() {
   const router = useRouter()
