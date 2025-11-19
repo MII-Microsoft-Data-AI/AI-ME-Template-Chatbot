@@ -19,6 +19,7 @@ from langchain_core.messages.utils import (
 from .tools import AVAILABLE_TOOLS
 from .model import model
 from utils.langgraph_content import sanitize_and_validate_messages
+from lib.tracing import get_microsoft_tracer
 from lib.langgraph import change_file_to_url
 
 class AgentState(TypedDict):
@@ -72,8 +73,6 @@ def call_model(state: AgentState, config = None) -> Dict[str, List[BaseMessage]]
     
     # Convert file://{id} URLs to temporary blob URLs with SAS tokens
     messages = change_file_to_url(messages)
-
-    print(messages)
 
     system_prompt = """
 # Your Role
@@ -185,7 +184,9 @@ workflow.add_conditional_edges(
 # Add edge from tools back to agent
 workflow.add_edge("tools", "agent")
 
+tracers = get_microsoft_tracer()
+
 # Compile the graph
 graph = workflow.compile(checkpointer=checkpointer).with_config(
-    {"recursion_limit": 100}
+    {"recursion_limit": 100, "callbacks": tracers}
 )
