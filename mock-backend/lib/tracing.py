@@ -1,4 +1,3 @@
-from dotenv import load_dotenv
 import os
 from dotenv import load_dotenv
 from langchain_azure_ai.callbacks.tracers import AzureAIOpenTelemetryTracer
